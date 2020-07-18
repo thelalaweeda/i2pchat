@@ -18,10 +18,10 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 #include "form_settingsgui.h"
+#include "Base.cpp"
 #include "Core.h"
 #include "UserBlockManager.h"
 #include <QFileDialog>
-#include "Base.cpp"
 
 form_settingsgui::form_settingsgui(CCore &Core, QWidget *parent,
                                    Qt::WindowFlags flags)
@@ -179,7 +179,7 @@ void form_settingsgui::loadSettings() {
 
   spinBox_4->setMinimum(1);
   spinBox_4->setValue(settings->value("inbound.length", "3").toInt());
-  spinBox_4->setMaximum(3);
+  spinBox_4->setMaximum(7);
 
   spinBox_5->setMinimum(0);
   spinBox_5->setValue(settings->value("inbound.quantity", "1").toInt());
@@ -195,7 +195,7 @@ void form_settingsgui::loadSettings() {
 
   spinBox_8->setMinimum(1);
   spinBox_8->setValue(settings->value("outbound.length", "3").toInt());
-  spinBox_8->setMaximum(3);
+  spinBox_8->setMaximum(7);
 
   spinBox_9->setMinimum(0);
   spinBox_9->setValue(settings->value("outbound.quantity", "1").toInt());
@@ -203,7 +203,9 @@ void form_settingsgui::loadSettings() {
 
   comboBox_Signature->setEditable(false);
   comboBox_Signature->setCurrentIndex(comboBox_Signature->findText(
-      settings->value("SIGNATURE_TYPE", "ED25519_SHA512").toString()));
+      //      settings->value("SIGNATURE_TYPE",
+      //      "EdDSA_SHA512_Ed25519").toString()));
+      settings->value("SIGNATURE_TYPE", "ECDSA_SHA512_P521").toString()));
   settings->endGroup();
 
   settings->beginGroup("Sound");
@@ -343,16 +345,16 @@ void form_settingsgui::loadSettings() {
   }
 
   if (settings->value("WebProfile", "Enabled").toString() == "Enabled") {
-  	blockallcheckBox_2->setChecked(true);
+    blockallcheckBox_2->setChecked(true);
   } else {
-  	blockallcheckBox_2->setChecked(false);
+    blockallcheckBox_2->setChecked(false);
   }
-  if (settings->value("HideWebProfileWhenInvisible", "True").toString() == "True") {
-        blockallcheckBox_3->setChecked(true);
+  if (settings->value("HideWebProfileWhenInvisible", "True").toString() ==
+      "True") {
+    blockallcheckBox_3->setChecked(true);
   } else {
-        blockallcheckBox_3->setChecked(false);
+    blockallcheckBox_3->setChecked(false);
   }
-
 
   if (!mCore.getMyDestination().isEmpty()) {
     size_t buffersize = 2048;
@@ -377,9 +379,9 @@ void form_settingsgui::loadSettings() {
     free(outputbuffer);
     free(b32buffer);
   } else {
-  b32address->setPlainText(QApplication::translate(
-      "form_settingsgui", "b32 address will be displayed when online",
-      Q_NULLPTR));
+    b32address->setPlainText(QApplication::translate(
+        "form_settingsgui", "b32 address will be displayed when online",
+        Q_NULLPTR));
   }
   settings->endGroup();
 
@@ -496,14 +498,14 @@ void form_settingsgui::saveSettings() {
     settings->setValue("BlockStyle", "Normal");
   }
   if (blockallcheckBox_2->isChecked() == true) {
-  	settings->setValue("WebProfile", "Enabled");
+    settings->setValue("WebProfile", "Enabled");
   } else {
-  	settings->setValue("WebProfile", "Disabled");
+    settings->setValue("WebProfile", "Disabled");
   }
   if (blockallcheckBox_3->isChecked() == true) {
-        settings->setValue("HideWebProfileWhenInvisible", "True");
+    settings->setValue("HideWebProfileWhenInvisible", "True");
   } else {
-        settings->setValue("HideWebProfileWhenInvisible", "False");
+    settings->setValue("HideWebProfileWhenInvisible", "False");
   }
 
   settings->endGroup();
