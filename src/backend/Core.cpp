@@ -38,6 +38,8 @@ CCore::CCore(QString configPath) {
   mSoundManager = new CSoundManager(mConfigPath);
 
   QSettings settings(mConfigPath + "/application.ini", QSettings::IniFormat);
+  m_access_anyone_incoming =
+      settings.value("Users/allow_incoming_new_users", true).toBool();
   settings.beginGroup("Network");
   mMyDestinationB32 = settings.value("MyDestinationB32", "").toString(),
 
@@ -159,6 +161,15 @@ QString CCore::calcSessionOptionString() const {
   // + " " for void CSessionController::doSessionCreate() a session option.
 
   SessionOptionString.append(
+      "i2cp.gzip=" + settings.value("i2cp.gzip", "true").toString() + " ");
+  SessionOptionString.append(
+      "i2cp.messageReliability=" +
+      settings.value("i2cp.messageReliability", "BestEffort").toString() + " ");
+  SessionOptionString.append(
+      "i2cp.fastReceive=" +
+      settings.value("i2cp.fastReceive", "true").toString() + " ");
+
+  SessionOptionString.append(
       "inbound.nickname=" +
       settings.value("TunnelName", "I2PChat").toString().replace(" ", "_") +
       " ");
@@ -187,29 +198,23 @@ QString CCore::calcSessionOptionString() const {
       " ");
 
   // throttle per client dest to max 60 connections/min to mitigate denial of
-  // service
-  SessionOptionString.append(
-      "i2p.streaming.maxConnsPerMinute=" +
-      settings.value("i2p.streaming.maxConnsPerMinute", "60").toString() + " ");
+  // service ?? is this hampering our file transfers???
+  // SessionOptionString.append(
+  //    "i2p.streaming.maxConnsPerMinute=" +
+  //    settings.value("i2p.streaming.maxConnsPerMinute", "60").toString() + "
+  //    ");
 
   // SIGNATURE_TYPE
 
   {
     // TODO: get from ui_form_settingsgui.h
 
-    /*
-        QStringList AllowSignTypes = {"ECDSA_SHA256_P256", "ECDSA_SHA384_P384",
-                                      "ECDSA_SHA512_P521",
-       "EdDSA_SHA512_Ed25519", "RedDSA_SHA512_Ed25519"};
-    */
-
     QStringList AllowSignTypes = {"ECDSA_SHA256_P256", "ECDSA_SHA384_P384",
-                                  "ECDSA_SHA512_P521"};
+                                  "ECDSA_SHA512_P521", "EdDSA_SHA512_Ed25519",
+                                  "RedDSA_SHA512_Ed25519"};
 
     auto sign_type =
-        //        settings.value("Signature_Type",
-        //        "EdDSA_SHA512_Ed25519").toString(); // invalid dest?!
-        settings.value("Signature_Type", "ECDSA_SHA512_P521").toString();
+        settings.value("Signature_Type", "EdDSA_SHA512_Ed25519").toString();
     auto notfound = true;
     for (int i = 0; i < AllowSignTypes.size(); ++i) {
       if (sign_type.contains(AllowSignTypes.at(i))) {
@@ -219,23 +224,22 @@ QString CCore::calcSessionOptionString() const {
       }
     }
     if (notfound)
-      //      SessionOptionString.append("SIGNATURE_TYPE=" +
-      //      QString("EdDSA_SHA512_Ed25519") + " ");
       SessionOptionString.append(
-          "SIGNATURE_TYPE=" + QString("ECDSA_SHA512_P521") + " ");
+          "SIGNATURE_TYPE=" + QString("EdDSA_SHA512_Ed25519") + " ");
   }
 
   /// TODO check for valid string match DSA_SHA1 || ECDSA_SHA256_P256 ... ; UPD:
   /// Maybe is fixed;
-  /// TODO which Signature_Type as default for best security ???
 
   // Encryption
-  // TODO: Add to UI
+  // TODO: Enable in UI
 
   {
     QStringList AllowEncTypes = {"4", "4,0", "4, 0"};
 
-    auto enc_type = settings.value("i2cp.leaseSetEncType=", "4,0").toString();
+    // auto enc_type = settings.value("i2cp.leaseSetEncType=",
+    // "4,0").toString();
+    auto enc_type = settings.value("i2cp.leaseSetEncType=", "4").toString();
     auto encnotfound = true;
     for (int i = 0; i < AllowEncTypes.size(); ++i) {
       if (enc_type.contains(AllowEncTypes.at(i))) {
@@ -247,8 +251,10 @@ QString CCore::calcSessionOptionString() const {
     if (encnotfound)
       SessionOptionString.append(
           "i2cp.leaseSetEncType=" +
-          settings.value("i2cp.leaseSetEncType=", "4,0").toString() + " ");
+          // settings.value("i2cp.leaseSetEncType=", "4,0").toString() + " ");
+          settings.value("i2cp.leaseSetEncType=", "4").toString() + " ");
   }
+
   settings.remove("SessionOptionString"); // no longer used,- so erase it
   settings.endGroup();
   settings.sync();
@@ -357,7 +363,7 @@ void CCore::slotStreamStatusReceived(const SAM_Message_Types::RESULT result,
     } else {
       mConnectionManager->doDestroyStreamObjectByID(ID);
       user->slotIncomingMessageFromSystem(
-          tr("Invalid User - Destination: please delete the user\n"));
+          tr("Invalid Contact Destination: please delete the user\n"));
       user->setConnectionStatus(CONNECTERROR);
     }
     deletePacketManagerByID(ID);
@@ -477,17 +483,6 @@ QString CCore::getConnectionDump() const {
       } else {
         Message += "\tStream Mode:\t???\n";
       }
-
-      // Print ConnectionType
-
-      //      if (Stream->getConnectionType() == UNKNOWN) {
-      //        Message += "\tTrust:\t\tUNKNOWN\n";
-      //      } else if (Stream->getConnectionType() == KNOWN) {
-      //        Message += "\tTrust:\t\tKNOWN\n";
-      //      } else {
-      //        Message += "\tTrust:\t\t???\n";
-      //      }
-      //      Message += "\tPurpose:\t\t" + Stream->getUsedFor() + "\n\n";
     }
 
     Message += "• Streams\n\n";
@@ -529,6 +524,8 @@ QString CCore::getConnectionDump() const {
         Message += "\n";
       } else if (Stream->getConnectionType() == KNOWN) {
         Message += "\tTrust:\t\tKNOWN\n";
+        if (Stream->getUsedFor() == "FileTransferSend")
+          Message += "\n";
       } else {
         Message += "\tTrust:\t\t???\n";
       }
@@ -650,13 +647,12 @@ QString CCore::getDestinationByID(qint32 ID) const {
     return user->getI2PDestination();
   }
 
-  CFileTransferSend *send = mFileTransferManager->getFileTransferSendsByID(ID);
+  CFileTransferSend *send = mFileTransferManager->getFileSendByID(ID);
   if (send != NULL) {
     return send->getDestination();
   }
 
-  CFileTransferReceive *receive =
-      mFileTransferManager->getFileTransferReceiveByID(ID);
+  CFileTransferReceive *receive = mFileTransferManager->getFileReceiveByID(ID);
   if (receive != NULL) {
     return receive->getDestination();
   }
@@ -825,11 +821,10 @@ void CCore::loadUserInfos() {
 
     QMessageBox *msgBox = new QMessageBox(NULL);
     msgBox->setIcon(QMessageBox::Information);
-    msgBox->setInformativeText(
-        tr("No username configured\nUsing \'%1\'  \n\nChange in "
-           "Settings -> User Details")
-            //            .arg(randomString));
-            .arg(mUserInfos.Nickname));
+    msgBox->setText(tr("\nNo username configured\nUsing \'%1\'  \n\nChange in "
+                       "Settings -> User Details")
+                        //            .arg(randomString));
+                        .arg(mUserInfos.Nickname));
 
     msgBox->setStandardButtons(QMessageBox::Ok);
     msgBox->setDefaultButton(QMessageBox::Ok);
@@ -853,6 +848,11 @@ void CCore::loadUserInfos() {
   }
   settings.endGroup();
   settings.sync();
+
+  if (!nicknameRegExp.exactMatch(mUserInfos.Nickname)) {
+    mUserInfos.Nickname = "NonValidNick";
+    emit signNicknameChanged();
+  }
 }
 
 const CReceivedInfos CCore::getUserInfos() const { return mUserInfos; }
@@ -918,3 +918,5 @@ QString CCore::canonicalizeTopicId(QString topicIdNonCanonicalized) {
   // FIXME canonicalizeTopicId(topicIdNonCanonicalized);
   return topicIdNonCanonicalized;
 }
+
+void CCore::changeAccessIncomingUsers(bool m) { m_access_anyone_incoming = m; }

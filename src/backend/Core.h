@@ -36,7 +36,7 @@
 #include "User.h"
 #include "UserBlockManager.h"
 
-#define CLIENTVERSION "0.2.32"
+#define CLIENTVERSION "0.2.36"
 #define CLIENTNAME "I2PChat"
 
 using namespace SAM_Message_Types;
@@ -147,5 +147,12 @@ private:
   void stopCore();
   void restartCore();
   void closeAllActiveConnections();
+public slots:
+  void changeAccessIncomingUsers(bool);
+
+protected:
+  bool m_access_anyone_incoming; // new users.
+public:
+  bool getAccessAnyoneIncoming() { return m_access_anyone_incoming; }
 };
 #endif

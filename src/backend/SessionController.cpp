@@ -17,8 +17,8 @@
  *   Free Software Foundation, Inc.,                                       *
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
-
 #include "SessionController.h"
+#include <QIcon>
 
 const QString SAM_HANDSHAKE_V3 = "HELLO VERSION MIN=3.1 MAX=3.1\n";
 
@@ -33,7 +33,7 @@ CSessionController::CSessionController(QString SamHost, QString SamPort,
   mDoneDisconnect = false;
 
   mAnalyser = new CI2PSamMessageAnalyser("CStreamController");
-  mHandShakeWasSuccesfullDone = false;
+  mHandshakeSuccessful = false;
   mSessionWasSuccesfullCreated = false;
   mSamPrivKey = SamPrivKey;
 
@@ -73,10 +73,12 @@ void CSessionController::slotDisconnected() {
     emit signSessionStreamStatusOK(false);
 
     QMessageBox msgBox(NULL);
+    QPixmap pixmap = QPixmap(":/icons/avatar.svg");
+    msgBox.setWindowIcon(QIcon(pixmap));
     msgBox.setIcon(QMessageBox::Critical);
-    msgBox.setInformativeText(
-        "I2P Stream Controller can't connect\n SAM or I2P crashed\nSAM Host: " +
-        mSamHost + " • SAM Port: " + mSamPort);
+    msgBox.setText("\nI2P Stream Controller can't connect\n SAM or I2P "
+                   "crashed\nSAM Host: " +
+                   mSamHost + ":" + mSamPort);
     msgBox.setStandardButtons(QMessageBox::Ok);
     msgBox.setDefaultButton(QMessageBox::Ok);
     msgBox.setWindowModality(Qt::NonModal);
@@ -104,17 +106,15 @@ void CSessionController::slotReadFromSocket() {
     case HELLO_REPLAY: {
       emit signDebugMessages(t);
       if (sam.result == OK) {
-        this->mHandShakeWasSuccesfullDone = true;
-        if (mSamPrivKey == "") {
+        this->mHandshakeSuccessful = true;
+        if (mSamPrivKey == "" || mSamPrivKey.length() <= 0) {
           QSettings settings(mConfigPath + "/application.ini",
                              QSettings::IniFormat);
           QString Signature = "SIGNATURE_TYPE=%s";
           settings.beginGroup("Network");
           Signature.replace(
-              "%s",
-              //              settings.value("Signature_Type",
-              //              "EdDSA_SHA512_Ed25519").toString());
-              settings.value("Signature_Type", "ECDSA_SHA512_P521").toString());
+              "%s", settings.value("Signature_Type", "EdDSA_SHA512_Ed25519")
+                        .toString());
           this->doDestGenerate(Signature);
           settings.endGroup();
           settings.sync();
@@ -137,10 +137,10 @@ void CSessionController::slotReadFromSocket() {
         if (sam.result == DUPLICATED_DEST) {
           QMessageBox msgBox(NULL);
           msgBox.setIcon(QMessageBox::Critical);
-          msgBox.setInformativeText(
-              tr("DUPLICATE DESTINATION DETECTED!\nDo not attempt to run "
-                 "I2PChat\nwith the same destination twice!\nSAM may need to "
-                 "be restarted."));
+          msgBox.setText(tr("DUPLICATE DESTINATION DETECTED!"));
+          msgBox.setInformativeText(tr(
+              "Do not attempt to run I2PChat with the same destination twice!"
+              "\nThe SAM client may need to be restarted."));
           msgBox.setStandardButtons(QMessageBox::Ok);
           msgBox.setDefaultButton(QMessageBox::Ok);
           msgBox.setWindowModality(Qt::NonModal);
@@ -231,6 +231,8 @@ void CSessionController::doSessionCreate() {
 
   QByteArray Message = "SESSION CREATE STYLE=STREAM ID=";
   Message += mBridgeName + " DESTINATION=" + mSamPrivKey;
+  // TODO: Enable as option for Non-persistent destination
+  // Message += mBridgeName + " DESTINATION=TRANSIENT";
 
   if (mSessionOptions.isEmpty() == false) {
     Message += " " + mSessionOptions;

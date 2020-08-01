@@ -27,7 +27,7 @@ form_fileReceive::form_fileReceive(CFileTransferReceive &FileReceive)
   connect(&FileReceive, SIGNAL(signFileReceivedFinishedOK()), this,
           SLOT(slot_FileReceivedFinishedOK()));
 
-  connect(&FileReceive, SIGNAL(signAllreadyReceivedSizeChanged(quint64)), this,
+  connect(&FileReceive, SIGNAL(signgetTransferredSizeChanged(quint64)), this,
           SLOT(slot_allreadyReceivedSizeChanged(quint64)));
 
   connect(&FileReceive, SIGNAL(signFileReceiveError()), this,
@@ -40,34 +40,41 @@ form_fileReceive::form_fileReceive(CFileTransferReceive &FileReceive)
   connect(&FileReceive, SIGNAL(signAverageReceiveSpeed(QString, QString)), this,
           SLOT(slot_SpeedChanged(QString, QString)));
 
-  connect(&FileReceive, SIGNAL(signETA(QString)), label_15,
+  connect(&FileReceive, SIGNAL(signETA(QString)), labelETA,
           SLOT(setText(QString)));
 
   init();
 }
 
+static void ElideLabel(QLabel *label, QString text) {
+  QFontMetrics metrix(label->font());
+  int width = label->width() - 6;
+  QString clippedText = metrix.elidedText(text, Qt::ElideMiddle, width);
+  label->setText(clippedText);
+}
+
 void form_fileReceive::init() {
   QString SSize;
   QString SType;
-  QLabel *label_4 = this->label_4;
-  QLabel *label_6 = this->label_6;
-  QLabel *label_7 = this->label_7;
+  QLabel *labelFilename = this->labelFilename;
+  QLabel *labelFilesize = this->labelFilesize;
   QProgressBar *progressBar = this->progressBar;
 
-  label_4->setText(FileReceive.getFileName());
+  // labelFilename->setText(FileReceive.getFileName());
+  QString file = FileReceive.getFileName();
+  ElideLabel(labelFilename, file);
+
   quint64 FileSize = FileReceive.getFileSize();
 
   FileReceive.doConvertNumberToTransferSize(FileSize, SSize, SType, false);
-  label_6->setText(SSize);
-  label_7->setText(SType);
+  labelFilesize->setText(SSize + " " + SType);
 
   checkBox_3->setChecked(true);
   progressBar->setMinimum(0);
   progressBar->setMaximum(FileReceive.getFileSize());
-  progressBar->setValue(FileReceive.getAllreadyReceivedSize());
+  progressBar->setValue(FileReceive.getTransferredSize());
   //  label_10->setText(FileReceive.getUsingProtocolVersion());
-  label_11->setText("waiting...");
-  label_12->setText("");
+  labelSpeed->setText("waiting...");
 }
 
 void form_fileReceive::slot_Button() {
@@ -99,6 +106,8 @@ void form_fileReceive::askTheUser() {
   FileReceive.doConvertNumberToTransferSize(FileSize, SSize, SizeName, false);
 
   QMessageBox *msgBox = new QMessageBox(NULL);
+  QPixmap pixmap = QPixmap(":/icons/avatar.svg");
+  msgBox->setWindowIcon(QIcon(pixmap));
   msgBox->setText(tr("Incoming File Transfer: %1 [%2%3]    ")
                       .arg(FileName)
                       .arg(SSize)
@@ -115,7 +124,7 @@ void form_fileReceive::askTheUser() {
 
     if (!FilePath.isEmpty()) {
       FileReceive.start(FilePath, true);
-      label_4->setText(FileReceive.getFileName());
+      labelFilename->setText(FileReceive.getFileName());
     } else {
       FileReceive.start("", false);
       this->close();
@@ -139,12 +148,11 @@ void form_fileReceive::closeEvent(QCloseEvent *e) {
 }
 
 void form_fileReceive::slot_SpeedChanged(QString SNumber, QString Type) {
-  label_11->setText(SNumber);
-  label_12->setText(Type);
+  labelSpeed->setText(SNumber + " " + Type);
 }
 
 void form_fileReceive::start() {
-  if (FileReceive.checkIfAllreadyAcceptTheRequest() == false) {
+  if (FileReceive.checkIfRequestAccepted() == false) {
     askTheUser();
   }
 }

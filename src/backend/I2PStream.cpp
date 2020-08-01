@@ -20,7 +20,7 @@
 #include "I2PStream.h"
 
 const QString SAM_HANDSHAKE_V3 = "HELLO VERSION MIN=3.1 MAX=3.1\n";
-const int CONNECTIONTIMEOUT = 60000;
+const int CONNECTIONTIMEOUT = 60 * 1000;
 
 CI2PStream::CI2PStream(QString mSamHost, QString mSamPort, qint32 mID,
                        QString mStreamBridgeName, StreamMode mMode,
@@ -33,11 +33,11 @@ CI2PStream::CI2PStream(QString mSamHost, QString mSamPort, qint32 mID,
   mDoneDisconnect = false;
   mSilence = false;
   mStatusReceived = false;
-  mHandShakeWasSuccesfullDone = false;
+  mHandshakeSuccessful = false;
   mConnectionType = UNKNOWN;
   mIncomingPackets = new QByteArray();
   mDestinationReceived = false;
-  mFIRSTPAKETCHAT_allreadySended = false;
+  mFIRSTPACKETCHAT_alreadySent = false;
   mTimer = NULL;
   mUnKnownConnectionTimeout.setInterval(CONNECTIONTIMEOUT);
 
@@ -130,8 +130,8 @@ void CI2PStream::slotDisconnected() {
   mStatusReceived = false;
   mDestinationReceived = false;
   mDoneDisconnect = false;
-  mHandShakeWasSuccesfullDone = false;
-  mFIRSTPAKETCHAT_allreadySended = false;
+  mHandshakeSuccessful = false;
+  mFIRSTPACKETCHAT_alreadySent = false;
 
   mUnKnownConnectionTimeout.stop();
 
@@ -150,13 +150,18 @@ void CI2PStream::slotReadFromSocket() {
     return;
   }
 
-  QString debugData = newData.replace("STREAM STATUS RESULT=", "STATUS: ")
-                          .replace("CANT_REACH_PEER MESSAGE=", "")
-                          .replace("\"Connection timed out\"\n", "No Response");
+  /*
+    QString debugData = newData.replace("STREAM STATUS RESULT=", "STATUS: ")
+                            .replace("CANT_REACH_PEER MESSAGE=", "")
+                            .replace("\"Connection timed out\"\n", "No
+    Response");
 
-  emit signDebugMessages("• [Stream ID: " + smID + "] Incoming ‣ " + debugData);
+    emit signDebugMessages("• [Stream ID: " + smID + "] Incoming ‣ " +
+    debugData);
+  */
+  emit signDebugMessages("• [Stream ID: " + smID + "] Incoming ‣ " + newData);
 
-  if (mHandShakeWasSuccesfullDone == false) {
+  if (mHandshakeSuccessful == false) {
 
     mIncomingPackets->append(newData);
     if (mIncomingPackets->indexOf("\n", 0) == -1) {
@@ -173,7 +178,7 @@ void CI2PStream::slotReadFromSocket() {
     QString t(CurrentPacket.data());
     SAM_MESSAGE sam = mAnalyser->Analyse(t);
     if (sam.type == HELLO_REPLAY && sam.result == OK) {
-      mHandShakeWasSuccesfullDone = true;
+      mHandshakeSuccessful = true;
     }
 
     delete mAnalyser;
@@ -253,7 +258,7 @@ void CI2PStream::slotReadFromSocket() {
     // start mUnKnownConnectionTimeout
     mUnKnownConnectionTimeout.start();
     emit signDebugMessages("• [Stream ID: " + smID +
-                           "] Controller ‣ Unknown Connection Timeout");
+                           "] Controller ‣ [Unknown] Connection Timeout");
     //--------------------------------
   } else {
     emit signDataReceived(mID, newData);
@@ -272,7 +277,7 @@ void CI2PStream::operator<<(const QByteArray Data) {
   QString smID = QString::number(mID, 10);
 
   if (mTcpSocket.state() == QTcpSocket::ConnectedState &&
-      mHandShakeWasSuccesfullDone) {
+      mHandshakeSuccessful) {
     emit signDebugMessages("• [Stream ID: " + smID + "] Outgoing ‣ " + Data);
 
     try {
@@ -339,6 +344,6 @@ void CI2PStream::slotInitConnectionTimeout() {
   doDisconnect();
 }
 
-void CI2PStream::setFIRSTPAKETCHAT_allreadySended(bool theValue) {
-  mFIRSTPAKETCHAT_allreadySended = theValue;
+void CI2PStream::setFIRSTPACKETCHAT_alreadySent(bool theValue) {
+  mFIRSTPACKETCHAT_alreadySent = theValue;
 }

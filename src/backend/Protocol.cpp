@@ -38,10 +38,10 @@ void CProtocol::newConnectionChat(const qint32 ID) {
   CI2PStream *stream = mCore.getI2PStreamObjectByID(ID);
 
   // send the ChatSystem\tProtocolVersion
-  if (stream->getFIRSTPAKETCHAT_allreadySended() == false) {
+  if (stream->getFIRSTPACKETCHAT_alreadySent() == false) {
     // sometime StreamStatusReceived is called again with streamstatus Ok
-    stream->setFIRSTPAKETCHAT_allreadySended(true);
-    *(stream) << (QString)FIRSTPAKETCHAT;
+    stream->setFIRSTPACKETCHAT_alreadySent(true);
+    *(stream) << (QString)FIRSTPACKETCHAT;
   }
 }
 
@@ -106,14 +106,16 @@ void CProtocol::slotInputKnown(const qint32 ID, const QByteArray Data) {
     CUser *thisUser = mCore.getUserManager()->getUserByI2P_ID(ID);
 
     if (thisUser != NULL) {
-      if (thisUser->getProtocolVersion() == "0.3") {
-        // BUG in Messenger_0.2.15 BETA :(
-        send(ANSWER_OF_GET_MAX_PROTOCOLVERSION_FILETRANSFER, ID,
-             QString("0.2"));
-      } else {
-        send(ANSWER_OF_GET_MAX_PROTOCOLVERSION_FILETRANSFER, ID,
-             FileTransferProtocol::MAXPROTOCOLVERSION);
-      }
+      /*
+            if (thisUser->getProtocolVersion() == "0.3") {
+              // BUG in Messenger_0.2.15 BETA :(
+              send(ANSWER_OF_GET_MAX_PROTOCOLVERSION_FILETRANSFER, ID,
+                   QString("0.2"));
+            } else {
+      */
+      send(ANSWER_OF_GET_MAX_PROTOCOLVERSION_FILETRANSFER, ID,
+           FileTransferProtocol::MAXPROTOCOLVERSION);
+      //      }
     }
   } else if (ProtocolInfoTag == "1006") { // GET_USER_INFOS
     using namespace User;
@@ -290,7 +292,7 @@ void CProtocol::slotInputUnknown(const qint32 ID, const QByteArray Data) {
   }
 
   if (stream->getConnectionType() == UNKNOWN) {
-    // check if First Paket = from a other CHATSYSTEM
+    // check if First Packet = from another CHATSYSTEM
     if (Data.contains("CHATSYSTEM\t") == true) {
       QByteArray temp = Data.mid(Data.indexOf("\t") + 1,
                                  Data.indexOf("\n") - Data.indexOf("\t") - 1);
@@ -350,7 +352,7 @@ void CProtocol::slotInputUnknown(const qint32 ID, const QByteArray Data) {
               stream->getDestination()) == false) {
 
         if (versiond >= 0.3) {
-          mCore.getUserManager()->addNewUser("Receiving",
+          mCore.getUserManager()->addNewUser("...identifying...",
                                              stream->getDestination(), ID);
         } else {
           mCore.getUserManager()->addNewUser("Unknown",
@@ -378,7 +380,7 @@ void CProtocol::slotInputUnknown(const qint32 ID, const QByteArray Data) {
       }
       // return Data2;
     } else if (Data.contains("CHATSYSTEMFILETRANSFER\t") == true) {
-      // FIRSTPAKET
+      // FIRSTPACKET
       // ="CHATSYSTEMFILETRANSFER\t"+PROTOCOLVERSION+"\nSizeinBit\nFileName";
       QByteArray Data2 = Data;
 
@@ -409,7 +411,7 @@ void CProtocol::slotInputUnknown(const qint32 ID, const QByteArray Data) {
       mCore.getFileTransferManager()->addNewFileReceive(
           ID, FileName, FileSize, Destination, ProtovolVersion);
     } else {
-      // not from a other CHATSYSTEM
+      // not from another CHATSYSTEM
       bool webprofileenabled = false;
       if (mCore.getUserBlockManager()->isDestinationInBlockList(
               stream->getDestination()) == true) {
@@ -440,16 +442,20 @@ void CProtocol::slotInputUnknown(const qint32 ID, const QByteArray Data) {
         settings.sync();
 
         if (webprofileenabled == true) {
-          printf("Web Profile enabled\n");
+          //          printf("Web Profile enabled\n"); // Debug
           QString TEMPHTTPPAGE =
               loadfile(mCore.getConfigPath() + "/www/index.html");
           if (TEMPHTTPPAGE.isEmpty()) {
             TEMPHTTPPAGE = HTTPPAGE;
           }
-          TEMPHTTPPAGE.replace("[USERNAME]", mCore.getUserInfos().Nickname);
+          QString myNick = mCore.getUserInfos().Nickname;
+          myNick = myNick.replace("<", "").replace(">", "");
+          TEMPHTTPPAGE.replace("[USERNAME]", myNick);
+
           TEMPHTTPPAGE.replace("[AVATARIMAGE]",
                                mCore.getUserInfos().AvatarImage.toBase64());
           TEMPHTTPPAGE.replace("[MYDEST]", mCore.getMyDestination());
+
           *(stream) << (QString)(gethttpheader(TEMPHTTPPAGE) + TEMPHTTPPAGE);
           mCore.getConnectionManager()->doDestroyStreamObjectByID(ID);
         } else { // what to do if the webprofile is disabled?
@@ -629,10 +635,10 @@ void CProtocol::send(const MESSAGES_TAGS TAG, const qint32 ID,
   QString temp;
 
   temp.setNum(Data.length() + 4, 16); // hex
-  QString Paketlength = QString("%1").arg(temp, 4, '0');
+  QString Packetlength = QString("%1").arg(temp, 4, '0');
 
   Data.insert(0, ProtocolInfoTag);
-  Data.insert(0, Paketlength);
+  Data.insert(0, Packetlength);
   *(stream) << Data;
 }
 
