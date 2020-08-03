@@ -449,6 +449,12 @@ void form_MainWindow::connecttreeWidgetCostumPopupMenu(QPoint point) {
   QAction *UserChat = new QAction(QIcon(ICON_CHAT), tr("Chat"), this);
   connect(UserChat, SIGNAL(triggered()), this, SLOT(openUserListeClicked()));
 
+  QAction *UserAutoDownload = new QAction(QIcon(ICON_USER_DOWNLOAD), tr("Auto-download"), this);
+  UserAutoDownload->setCheckable(true);
+  // connect(UserAutoDownload, SIGNAL(triggered(bool)), this,
+  //         SLOT(UserAutoDownload(bool)));
+  UserAutoDownload->setEnabled(false);
+
   QAction *UserInvisible =
       new QAction(QIcon(ICON_USER_INVISIBLE), tr("Invisible"), this);
   UserInvisible->setCheckable(true);
@@ -470,6 +476,7 @@ void form_MainWindow::connecttreeWidgetCostumPopupMenu(QPoint point) {
   QAction *CopyB32 =
       new QAction(QIcon(ICON_WEB), tr("Copy B32 Address"), this);
   connect(CopyB32, SIGNAL(triggered()), this, SLOT(copyB32()));
+  CopyB32->setEnabled(false);
 
   QAction *ShowUserInfos =
       new QAction(QIcon(ICON_ABOUT), tr("User Info"), this);
@@ -513,6 +520,7 @@ void form_MainWindow::connecttreeWidgetCostumPopupMenu(QPoint point) {
     }
 
     contextMnu.addAction(UserInvisible);
+    contextMnu.addAction(UserAutoDownload);
     contextMnu.addAction(UserToBlockList);
     contextMnu.addAction(UserDelete);
     contextMnu.addSeparator();
@@ -525,6 +533,8 @@ void form_MainWindow::connecttreeWidgetCostumPopupMenu(QPoint point) {
     contextMnuPos.addAction(DOWN);
 
     contextMnu.addMenu(&contextMnuPos);
+    // TODO: Fix width of context menu and ensure sub-menu overlaps
+    // contextMnu.setMaximumWidth(170);
     contextMnu.exec(mevent->globalPos());
   }
 }
